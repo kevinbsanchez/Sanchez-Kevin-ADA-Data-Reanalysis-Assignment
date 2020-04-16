@@ -1,0 +1,421 @@
+---
+title: "Data Reanalysis of Wang et al. (2018)"
+author: "Kevin Sanchez"
+date: "4/16/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = TRUE,
+	message = TRUE,
+	comment = "##",
+	prompt = FALSE,
+	tidy = TRUE,
+	tidy.opts = list(blank = FALSE, width.cutoff = 75),
+	fig.path = "img/",
+	fig.align = "center"
+)
+```
+
+## Introduction
+
+### Wang et al. (2018) — 17β-estradiol (E2) promotes growth and stability of new dendritic spines via estrogen receptor β pathway in intact mouse cortex
+
+Recent studies have found that altering levels of estradiol (E2), the most potent estrogen,
+can affect neuronal function in several brain regions like the hippocampus and prefrontal
+cortex. One potential mechanism is through modulation of dendritic spine density in these 
+brain regions, which can impact advanced cognitive functions like learning and memory. 
+The objective of this paper is to quantify how E2 treatment can alter the growth and removal 
+of these dendritic spines. Additionally, the authors wanted to investigate which of the two 
+estrogen receptors (ERs), ERα and ERβ, are involved in mediating this process. They used the
+ER agonists α-PPT and β-DPN to enhance the activity of ERα and ERβ, respectively.
+
+Their raw data is stratified into two discrete time periods where they observed changes in 
+dendritic spines: 0-4 days (d4) and 4-8 days (d8). For some analyses, they used the
+combination of these time periods from 0-8 days (dT). The raw data quantifies the total 
+number of dendritic spines initially observed (d#_total) and the number of spines that were 
+stable, eliminated, or formed after the time period described (d#_stable, d#_elim, d#_form, 
+respectively).
+
+The analyses performed by the authors include descriptive statistics for each of the 
+parameters described above, including the mean, standard deviation, and standard error of 
+the mean. To determine if there were differences between experimental groups, the authors 
+employed a t-test. All of their data were graphed as bar graphs.
+
+In this assignment, I will be replicating most of the descriptive statistics that the 
+authors performed. Using their data comparing dendritic spine characteristics between the 
+control and E2-treated mice, I will redo their t-test and compare it to the authors' 
+results. Lastly, I will recreate the three graphs from Figure 2 of their paper.
+
+## Visualization of Data
+First, I will load in the raw data files in .xlsx format using the package {readxl}.
+```{r}
+library(readxl)
+file <- "Wang et al. (2018) Raw Data.xlsx"
+rawdata <- read_excel(file, sheet = 1, col_names = TRUE)
+```
+Using `head()` will confirm that the data set was imported into **_R_** correctly. The 
+`names()` function is also useful in providing all the header names that will be used in 
+subsequent analyses.
+``` {r}
+head(rawdata)
+names(rawdata)
+```
+Next, I will filter the entire data set based on experimental group using `filter()` from
+{dplyr}. This will yield five new tables that can be easily used for comparison of variables 
+between experimental groups. Note that the authors of the paper state that the wild-type 1 
+(WT1) group is used for comparisons with the E2 group and that the wild-type 2 (WT2) group 
+is used to compare with the DPN and PPT groups. 
+``` {r}
+library(dplyr)
+WT1 <- filter(rawdata, rawdata$Exp_Group == "WT1")
+E2 <- filter(rawdata, rawdata$Exp_Group == "E2")
+WT2 <- filter(rawdata, rawdata$Exp_Group == "WT2")
+DPN <- filter(rawdata, rawdata$Exp_Group == "DPN")
+PPT <- filter(rawdata, rawdata$Exp_Group == "PPT")
+```
+Now that I have these filtered data sets, I can draw both basic and more sophisticated 
+comparisons between experimental groups. For example, let's compare the means of the total 
+dendritic spines (**dT_total**). Other studies have demonstrated that treatment with E2
+increases spine density; therefore, I would expect to have a higher value of **dT_total**
+in the E2 group compared to the WT1 group. 
+```{r}
+mean(WT1$dT_total, na.rm = TRUE)
+mean(E2$dT_total, na.rm = TRUE)
+```
+Although I cannot claim statistical significance at this stage of the analysis, it does 
+appear that the E2 group has a higher density of dendritic spines compared with WT1. I can
+more broadly see an overview of each variable and its five-number summary using the 
+`summary()` function. Let's do this with just the **WT1** and **E2** data sets. 
+```{r}
+summary(WT1)
+summary(E2)
+```
+This output makes it a little difficult to neatly draw comparisons between groups. I can
+compare the variable **dT_total** across all experimental groups by using the package
+{ggplot2} on the **rawdata** file.
+``` {r}
+library(ggplot2)
+bp_dT_total <- ggplot(data = rawdata, aes(x = Exp_Group, y = dT_total)) + 
+  geom_boxplot(na.rm = TRUE) +
+  theme(axis.text.x = element_text(angle = 0)) + 
+  xlab("Experimental Group") + ylab("Total Dendritic Spines")
+bp_dT_total
+```
+Doing these box plots allows for neat visual comparisons between groups and for observing 
+the variability within groups. Another method of data exploration includes using the package
+{psych} to determine correlations between several variables. I will first use the 
+`select()` function of {dplyr} to condense the **rawdata** data set to include variables
+looking at dendritic spine characteristics across the 8 day experiment (i.e., **dT_total**,
+**dT_stable**, **dT_elim**, and **dT_form**. I will then pass this selected data set through
+the `pairs.panels()` function to create the scatter plot matrix of correlation between
+variables.
+``` {r}
+library(psych)
+rawdata_select <- select(rawdata, Exp_Group, dT_total, dT_stable, dT_elim, dT_form)
+pairs.panels(rawdata_select[],
+             smooth = FALSE,
+             lm = TRUE,
+             method = "pearson",
+             hist.col = "#00AFBB",
+             density = TRUE,
+             ellipses = TRUE
+)
+```
+From this scatter plot matrix, I can that there is a strong, positive correlation (r=0.97) 
+between the total amount of dendritic spines and the number of stable, persistent spines.
+Now that I have done some exploratory data analysis, I will replicate some of the authors' 
+data, repeat their t-tests between experimental groups, and recreate the three graphs from
+Figure 2 of their paper.
+ 
+## Replications and Reanalysis
+To start, I will first reanalyze the describe statistics in Sections 2.2 and 2.3 of the
+paper. This entails quantifying how E2 treatment affects dendritic spine formation rate,
+total quantity of spines, and persistent newly formed spines. First, I will determine 
+whether the spine formation rate is different between the WT1 and E2 groups during the 0-4,
+4-8, or 0-8 day window. Spine formation rate (SFR) is determined as the number of newly 
+formed spines (d#_form) divided by the the total number of spines (d#_total) multiplied by 
+100 to obtain the percentage. Below, I calculate the mean and standard error of the mean
+(i.e., standard deviation divided by the square root of counts) for the two groups at the
+different time points. 
+```{r}
+print("SFR (Mean ± SEM) for WT Group Between Days 0-4")
+(SFRm_WT_4 <- mean(WT1$d4_form / WT1$d4_total, na.rm = TRUE) * 100)
+(SFRs_WT_4 <- sd((WT1$d4_form / WT1$d4_total) * 100, na.rm = TRUE) / sqrt(length(WT1$d4_form)))
+print("SFR (Mean ± SEM) for E2 Group Between Days 0-4")
+(SFRm_E2_4 <- mean(E2$d4_form / E2$d4_total, na.rm = TRUE) * 100)
+(SFRs_E2_4 <- sd((E2$d4_form / E2$d4_total) * 100, na.rm = TRUE) / sqrt(length(E2$d4_form)))
+
+print("SFR (Mean ± SEM) for WT Group Between Days 4-8")
+(SFRm_WT_8 <- mean(WT1$d8_form / WT1$d8_total, na.rm = TRUE) * 100)
+(SFRs_WT_8 <- sd((WT1$d8_form / WT1$d8_total) * 100, na.rm = TRUE) / sqrt(length(WT1$d8_form)))
+print("SFR (Mean ± SEM) for E2 Group Between Days 4-8")
+(SFRm_E2_8 <- mean(E2$d8_form / E2$d8_total, na.rm = TRUE) * 100)
+(SFRs_E2_8 <- sd((E2$d8_form / E2$d8_total) * 100, na.rm = TRUE) / sqrt(length(E2$d8_form)))
+
+print("SFR (Mean ± SEM) for WT Group Between Days 0-8")
+(SFRm_WT_T <- mean(WT1$dT_form / WT1$dT_total, na.rm = TRUE) * 100)
+(SFRs_WT_T <- sd((WT1$dT_form / WT1$dT_total) * 100, na.rm = TRUE) / sqrt(length(WT1$dT_form)))
+print("SFR (Mean ± SEM) for E2 Group Between Days 0-8")
+(SFRm_E2_T <- mean(E2$dT_form / E2$dT_total, na.rm = TRUE) * 100)
+(SFRs_E2_T <- sd((E2$dT_form / E2$dT_total) * 100, na.rm = TRUE) / sqrt(length(E2$dT_form)))
+```
+In the paper, the authors state "the spine formation rate increased significantly four days 
+after E2 treatment (Fig. 2B; spine formation during days 0–4: control, 4.6 ± 0.6%; E2, 
+6.4 ± 0.5%)." My reanalysis of the SFR from the raw data corroborates the authors' 
+statement. The mean ± SEM value for SFR_WT_4 and SFR_E2_4 are 4.62 ± 0.58% and 6.44 ± 0.51%,
+respectively.
+
+Next, I will compare the total dendritic spine count (TSC) between the WT1 and E2 groups 
+across the different time periods. This total spine count is calculated as 100% plus the 
+percentage of newly formed spines (d#_form) minus the percentage of eliminated spines 
+(d#_elim). I have already calculated the percentage of newly formed spines above, but will 
+redo the analysis using the `mutate()` function from {dplyr} instead of just raw
+calculations. The additional columns created will be added to a new data set called either
+**WT1m** or **E2m**.
+``` {r}
+WT1m <- mutate(WT1, "SFR_4" = WT1$d4_form / WT1$d4_total * 100)
+WT1m <- mutate(WT1m, "SFR_8" = WT1$d8_form / WT1$d8_total * 100)
+WT1m <- mutate(WT1m, "SFR_T" = WT1$dT_form / WT1$dT_total * 100)
+WT1m <- mutate(WT1m, "SER_4" = WT1$d4_elim / WT1$d4_total * 100)
+WT1m <- mutate(WT1m, "SER_8" = WT1$d8_elim / WT1$d8_total * 100)
+WT1m <- mutate(WT1m, "SER_T" = WT1$dT_elim / WT1$dT_total * 100)
+WT1m <- mutate(WT1m, "TSC_4" = 100 + WT1m$SFR_4 - WT1m$SER_4)
+WT1m <- mutate(WT1m, "TSC_8" = 100 + WT1m$SFR_8 - WT1m$SER_8)
+WT1m <- mutate(WT1m, "TSC_T" = 100 + WT1m$SFR_T - WT1m$SER_T)
+
+E2m <- mutate(E2, "SFR_4" = E2$d4_form / E2$d4_total * 100)
+E2m <- mutate(E2m, "SFR_8" = E2$d8_form / E2$d8_total * 100)
+E2m <- mutate(E2m, "SFR_T" = E2$dT_form / E2$dT_total * 100)
+E2m <- mutate(E2m, "SER_4" = E2$d4_elim / E2$d4_total * 100)
+E2m <- mutate(E2m, "SER_8" = E2$d8_elim / E2$d8_total * 100)
+E2m <- mutate(E2m, "SER_T" = E2$dT_elim / E2$dT_total * 100)
+E2m <- mutate(E2m, "TSC_4" = 100 + E2m$SFR_4 - E2m$SER_4)
+E2m <- mutate(E2m, "TSC_8" = 100 + E2m$SFR_8 - E2m$SER_8)
+E2m <- mutate(E2m, "TSC_T" = 100 + E2m$SFR_T - E2m$SER_T)
+
+print("TSC (Mean ± SEM) for WT Group Between Days 0-4")
+(TSCm_WT_4 <- mean(WT1m$TSC_4, na.rm = TRUE))
+(TSCs_WT_4 <- sd(WT1m$TSC_4, na.rm = TRUE) / sqrt(length(WT1m$TSC_4)))
+print("TSC (Mean ± SEM) for E2 Group Between Days 0-4")
+(TSCm_E2_4 <- mean(E2m$TSC_4, na.rm = TRUE))
+(TSCs_E2_4 <- sd(E2m$TSC_4, na.rm = TRUE) / sqrt(length(E2m$TSC_4)))
+
+print("TSC (Mean ± SEM) for WT Group Between Days 4-8")
+(TSCm_WT_8 <- mean(WT1m$TSC_8, na.rm = TRUE))
+(TSCs_WT_8 <- sd(WT1m$TSC_8, na.rm = TRUE) / sqrt(length(WT1m$TSC_8)))
+print("TSC (Mean ± SEM) for E2 Group Between Days 4-8")
+(TSCm_E2_8 <- mean(E2m$TSC_8, na.rm = TRUE))
+(TSCs_E2_8 <- sd(E2m$TSC_8, na.rm = TRUE) / sqrt(length(E2m$TSC_8)))
+
+print("TSC (Mean ± SEM) for WT Group Between Days 0-8")
+(TSCm_WT_T <- mean(WT1m$TSC_T, na.rm = TRUE))
+(TSCs_WT_T <- sd(WT1m$TSC_T, na.rm = TRUE) / sqrt(length(WT1m$TSC_T)))
+print("TSC (Mean ± SEM) for E2 Group Between Days 0-8")
+(TSCm_E2_T <- mean(E2m$TSC_T, na.rm = TRUE))
+(TSCs_E2_T <- sd(E2m$TSC_T, na.rm = TRUE) / sqrt(length(E2m$TSC_T)))
+```
+This analysis perfectly matches what is described by the authors. They stated "a significant
+increase in the total spine number in E2 implanted mice compared to that in control mice 
+(Fig. 2C; total spine number during days 0–4: control, 96.5 ± 0.9%; E2, 100.0 ± 0.5%; total
+spine number during days 0–8: control, 93.6 ± 1.5%; E2, 98.9 ± 1.2%)". During days 0-4, I
+found an average TSC of 96.47 ± 0.87% in the WT1 group and 99.98% ± 0.51% for the E2 group.
+From days 0-8, I reported an average TSC of 93.59 ± 1.49% and 98.87 ± 1.16% for the WT1 and
+E2 groups, respectively.
+
+The final descriptive statistic test I will perform will be calculating the persistent newly
+formed spine ratio (PNFS). This measures the percentage of newly formed spines (previously
+determined as SFR) that remained and persisted during days 0-4 of the experiment. In our
+data files, this information can be found under the variable **d4_nfs_pers**. As before,
+I will first use the `mutate()` function and then calculate the average and standard error
+of the mean.
+```{r}
+WT1m <- mutate(WT1m, "PNFS" = WT1m$d4_nfs_pers / WT1m$d4_form * 100)
+print("PNFS (Mean ± SEM) for WT Group Between Days 0-4")
+(PNFSm_WT <- mean(WT1m$PNFS, na.rm = TRUE))
+(PNFSs_WT <- sd(WT1m$PNFS, na.rm = TRUE) / sqrt(length(WT1m$PNFS)))
+
+E2m <- mutate(E2m, "PNFS" = E2m$d4_nfs_pers / E2m$d4_form * 100)
+print("PNFS (Mean ± SEM) for E2 Group Between Days 0-4")
+(PNFSm_E2 <- mean(E2m$PNFS, na.rm = TRUE))
+(PNFSs_E2 <- sd(E2m$PNFS, na.rm = TRUE) / sqrt(length(E2m$PNFS)))
+```
+From these calculated results, we can see the values very closely match those reported by
+the authors. In the manuscript, they state that "in the E2 exposure group, the persistent 
+newly formed spine ratio is almost twice as high as that in the control group (Fig. 3C; 
+control, 37.5 ± 9.0%; E2, 68.8 ± 3.9%)." I found that the PNFS was 37.50 ± 8.33% for the
+control group and 68.85 ± 3.87% for the E2 group. 
+
+All of the descriptive statistics calculated thus far make it seem like there is a potential
+difference in dendritic spine characteristics between the WT1 and E2 groups. To determine
+whether this is statistically significant, I will conduct a t-test on the spine formation
+rate, total spine count, and persistent newly formed spine ratio using **_R_**.
+``` {r}
+print("Student's t-Test for Spine Formation Rate from Days 0-4")
+t.test(WT1m$SFR_4, E2m$SFR_4, conf.level = 0.95)
+print("Student's t-Test for Spine Formation Rate from Days 4-8")
+t.test(WT1m$SFR_8, E2m$SFR_8, conf.level = 0.95)
+print("Student's t-Test for Spine Formation Rate from Days 0-8")
+t.test(WT1m$SFR_T, E2m$SFR_T, conf.level = 0.95)
+
+print("Student's t-Test for Total Spine Count from Days 0-4")
+t.test(WT1m$TSC_4, E2m$TSC_4, conf.level = 0.95)
+print("Student's t-Test for Total Spine Count from Days 4-8")
+t.test(WT1m$TSC_8, E2m$TSC_8, conf.level = 0.95)
+print("Student's t-Test for Total Spine Count from Days 0-8")
+t.test(WT1m$TSC_T, E2m$TSC_T, conf.level = 0.95)
+
+print("Student's t-Test for Persistent Newly Formed Spine Ratio from Days 0-4")
+t.test(WT1m$PNFS, E2m$PNFS, conf.level = 0.95)
+```
+When the authors performed a Student's t-test on their results for the spine formation rate
+from days 0-4, they got a p-value of 0.034. Performing this same analysis in **_R_** led to 
+a p-value of 0.03442, which is consistent with what the authors found. Next, the authors
+calculated a p-value of 0.006 in comparing the total number of spines from days 0-4 and a
+p-value of 0.024 from days 0-8. Once again, the results that I obtained by performing the
+Student's t-test was identical to that in the paper. I attained a p-value of 0.006139
+between days 0-4 and 0.02401 from days 0-8. Lastly, the authors noted a p-value of 0.016 in
+comparing the persistent newly formed spine ratio from days 0-4. When I conducted this
+analysis, I got a p-value of 0.01545 that is very similar to what the authors found. Since
+all of these p-values are under the critical value of 0.05, then it can be stated that these
+presented results are statistically significant.
+
+My next goal is to recreate the three graphs from Figure 2 of their paper. This image 
+investigates how E2 treatment affects dendritic spine turnover and density during days 0-4,
+4-8, and 0-8. In order to create these graphs, I need to create a new data frame that
+compiles all the values of SER, SFR, and TSC across the different experimental groups and
+day range. The key function that I use for this is `unlist()`. 
+```{r}
+Exp_Group <- c(rep("WT", 21), rep("E2", 27))
+Day <- c(rep("0-4", 7), rep("4-8", 7), rep("0-8", 7), 
+         rep("0-4", 9), rep("4-8", 9), rep("0-8", 9))
+SER <- unlist(c(WT1m$SER_4, WT1m$SER_8, WT1m$SER_T, 
+                E2m$SER_4, E2m$SER_8, E2m$SER_T), use.names = FALSE)
+SFR <- unlist(c(WT1m$SFR_4, WT1m$SFR_8, WT1m$SFR_T, 
+                E2m$SFR_4, E2m$SFR_8, E2m$SFR_T), use.names = FALSE)
+TSC <- unlist(c(WT1m$TSC_4, WT1m$TSC_8, WT1m$TSC_T, 
+                E2m$TSC_4, E2m$TSC_8, E2m$TSC_T), use.names = FALSE)
+Fig2_data <- data.frame(Exp_Group, Day, SER, SFR, TSC)
+head(Fig2_data)
+```
+Now, I will create a function that determines the mean and standard error of the mean for
+each of the variables that will be plotted. I will call this function `data_summary`. The
+output after using this function will be stored in a new data frame (Fig2_###_datsum) that 
+is specific to each of the three variables to be plotted (i.e., **SER**, **SFR**, and 
+**TSC**). The package {ggplot2} will then be used to replicate the graphs in Figure 2 of the
+paper. I will lay out each panel side-by-side for easy comparison between these graphs. 
+``` {r}
+library(plyr)
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm = TRUE),
+      se = sd(x[[col]], na.rm = TRUE) / sqrt(length(x[[col]])))
+  }
+  data_sum <- ddply(data, groupnames, .fun = summary_func, varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+  return(data_sum)
+}
+
+Fig2_SER_datsum <- data_summary(Fig2_data, varname = "SER", groupnames = c("Exp_Group", "Day"))
+Fig2_SER_datsum$Exp_Group <- factor(Fig2_SER_datsum$Exp_Group, levels = c("WT", "E2"))
+Fig2_SER <- ggplot(data = Fig2_SER_datsum, aes(x = Day, y = SER, fill = Exp_Group)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_manual(values = c('#999999','#E69F00')) +
+  scale_x_discrete(limits = c("0-4", "4-8", "0-8")) +
+  xlab("") + ylab("Elimination (%)") +
+  scale_color_grey() + theme_classic() +
+  geom_errorbar(aes(ymin = SER - se, ymax = SER + se), width = .2, 
+                position = position_dodge(.9)) +
+  labs(fill = "Experimental Group") +
+  scale_y_continuous(breaks = seq(0, 15, len = 6)) +
+  ggtitle("Effect of E2 Treatment on Dendritic Spine Elimination") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+Fig2_SFR_datsum <- data_summary(Fig2_data, varname = "SFR", groupnames = c("Exp_Group", "Day"))
+Fig2_SFR_datsum$Exp_Group <- factor(Fig2_SFR_datsum$Exp_Group, levels = c("WT", "E2"))
+Fig2_SFR <- ggplot(data = Fig2_SFR_datsum, aes(x = Day, y = SFR, fill = Exp_Group)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_manual(values = c('#999999','#E69F00')) +
+  scale_x_discrete(limits = c("0-4", "4-8", "0-8")) +
+  xlab("") + ylab("Formation (%)") +
+  scale_color_grey() + theme_classic() +
+  geom_errorbar(aes(ymin = SFR - se, ymax = SFR + se), width = .2, 
+                position = position_dodge(.9)) +
+  labs(fill = "Experimental Group") +
+  scale_y_continuous(breaks = seq(0, 15, len = 6)) +
+  ggtitle("Effect of E2 Treatment on Dendritic Spine Formation") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+Fig2_TSC_datsum <- data_summary(Fig2_data, varname = "TSC", groupnames = c("Exp_Group", "Day"))
+Fig2_TSC_datsum$Exp_Group <- factor(Fig2_TSC_datsum$Exp_Group, levels = c("WT", "E2"))
+Fig2_TSC <- ggplot(data = Fig2_TSC_datsum, aes(x = Day, y = TSC, fill = Exp_Group)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_manual(values = c('#999999','#E69F00')) +
+  scale_x_discrete(limits = c("0-4", "4-8", "0-8")) +
+  xlab("") + ylab("Total Spine Number (%)") +
+  scale_color_grey() + theme_classic() +
+  geom_errorbar(aes(ymin = TSC - se, ymax = TSC + se), width = .2, 
+                position = position_dodge(.9)) +
+  labs(fill = "Experimental Group") +
+  coord_cartesian(ylim = c(84, 104)) +
+  ggtitle("Effect of E2 Treatment on Total Spine Count") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+Fig2_SER
+```
+<p align="center">
+<img src="img/Screen Shot 2020-04-16 at 1.29.00 PM.png" height="400px" width="400px"/>
+</p>
+``` {r}
+Fig2_SFR
+```
+<p align="center">
+<img src="img/Screen Shot 2020-04-16 at 1.29.08 PM.png" height="400px" width="400px"/>
+</p>
+``` {r}
+Fig2_TSC
+```
+<p align="center">
+<img src="img/Screen Shot 2020-04-16 at 1.29.21 PM.png" height="400px" width="500px"/>
+</p>
+
+In observing these three pairs of images, my reanalysis of the authors' data appeared to be
+successful and matched with Figure 2 of the manuscript.
+
+## Discussion
+In summary, I was able to successfully replicate the descriptive and inferential statistics
+of Sections 2.2 and 2.3 of the paper while also recreating Figure 2. The technique the 
+authors used to calculate statistical significance in Figure 2 was a Student's t-test. The 
+statistically significant differences between the WT1 and E2 groups in terms of SER, SFR, 
+and TSC that I found were also consistent with what the authors reported. 
+
+There were several limitations that I noticed in the authors' data. There were several 
+missing values scattered across different groups that are unaccounted for in the paper. 
+Typically, you would not include data points that you don't have complete data for, 
+especially if no reason is given for this. The authors' also had a relatively low n count of
+just 6 for the WT1 group, which can affect the power of their study. Additionally, when I 
+was doing the exploratory data analyses, I noticed that there was a noticeable difference in
+total dendritic spine count between the WT1 and WT2 groups, even though these animals were 
+exposed to the same exact treatment condition. In fact, a t-test between these two wild-type
+groups (performed below) had a p-value of 0.1608. This definitely warrants some explanation 
+as to why this difference exists.
+``` {r}
+t.test(WT1$dT_total, WT2$dT_total)
+```
+I think that the authors could have performed a repeated measures ANOVA to determine whether
+dendritic spine formation and elimination is also affected as a function of time post-E2 
+treatment. I feel like performing other statistical tests in addition to a Student's t-test 
+would help strengthen the paper and could lead to interesting discoveries.
+
+Overall, I feel that working on this assignment has really helped strengthen my **_R_** 
+skills. Given that this paper is in a similar research field that I am in, I can now see
+myself being able to use **_R_** in my own research and data analysis. I found that the
+trickiest parts of this data replication assignment was replicating the graphs in Figure 2.
+This required some reorganization of the raw data file and creation of new data frames that 
+I was unfamiliar with. I also learned a lot about many of the difficult functionalities of
+{ggplot2} and what makes it such a versatile package. 
